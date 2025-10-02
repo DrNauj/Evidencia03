@@ -1,0 +1,48 @@
+{% extends "processor/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Procesamiento de Datos Bancarios</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <button type="submit" class="btn btn-primary">Procesar Datos</button>
+            </form>
+        </div>
+    </div>
+
+    {% if processing_status %}
+    <div class="mt-4">
+        <h3>Estado del Procesamiento</h3>
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: {{ processing_status.progress }}%">
+                {{ processing_status.progress }}%
+            </div>
+        </div>
+        <p class="mt-2">{{ processing_status.message }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Poll endpoint /api/status/ cada 2s y actualizar barra de progreso si existe
+function updateStatus(){
+    fetch('{% url "processing_status" %}')
+    .then(r => r.json())
+    .then(data => {
+        const bar = document.querySelector('.progress-bar');
+        if(bar && data.progress !== undefined){
+            bar.style.width = data.progress + '%';
+            bar.textContent = data.progress + '%';
+        }
+    }).catch(()=>{});
+}
+setInterval(updateStatus, 2000);
+updateStatus();
+</script>
+{% endblock %}

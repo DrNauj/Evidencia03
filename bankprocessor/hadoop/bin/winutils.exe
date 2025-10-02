@@ -1,0 +1,6 @@
+@echo off
+if not exist %HADOOP_HOME%\bin\winutils.exe (
+    echo Error: winutils.exe not found in %HADOOP_HOME%\bin
+    exit /b 1
+)
+exit /b 0

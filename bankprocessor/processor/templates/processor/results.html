@@ -1,0 +1,326 @@
+{% extends "processor/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Resultados del Procesamiento</h2>
+    
+    {% if job %}
+    <div class="mb-3">
+        <label>Progreso del Job {% if job %}{{ job.id }}{% else %}-{% endif %}:</label>
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: {{ job.progress }}%">{{ job.progress }}%</div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Información del Procesamiento</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <th>Estado:</th>
+                                <td><span id="job-status-badge" class="badge {% if job.status == 'completed' %}bg-success{% elif job.status == 'error' %}bg-danger{% else %}bg-warning{% endif %}">
+                                    {{ job.get_status_display }}
+                                </span></td>
+                            </tr>
+                            <tr>
+                                <th>Clave de fragmentación:</th>
+                                <td>{{ job.batch_key }}</td>
+                            </tr>
+                            <tr>
+                                <th>Tamaño de lote:</th>
+                                <td>{{ job.batch_size }}</td>
+                            </tr>
+                            <tr>
+                                <th>Total registros:</th>
+                                <td id="job-total-records">{{ job.total_records }}</td>
+                            </tr>
+                            <tr>
+                                <th>Lotes procesados:</th>
+                                <td id="job-lotes-procesados">{{ results|length }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Métricas Promedio</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <th>Accuracy:</th>
+                                <td id="avg-accuracy">{% if results and results|length > 0 %}{{ results.0.accuracy|floatformat:4 }}{% else %}-{% endif %}</td>
+                            </tr>
+                            <tr>
+                                <th>Precision:</th>
+                                <td id="avg-precision">{% if results|length > 0 %}{{ results.0.precision|floatformat:4 }}{% else %}-{% endif %}</td>
+                            </tr>
+                            <tr>
+                                <th>Recall:</th>
+                                <td id="avg-recall">{% if results|length > 0 %}{{ results.0.recall|floatformat:4 }}{% else %}-{% endif %}</td>
+                            </tr>
+                            <tr>
+                                <th>F1 Score:</th>
+                                <td id="avg-f1">{% if results|length > 0 %}{{ results.0.f1_score|floatformat:4 }}{% else %}-{% endif %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Gráficos: accuracy por lote (línea) y registros por lote (barras) -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Accuracy por Lote</h5></div>
+                <div class="card-body">
+                    <canvas id="chart-accuracy" width="800" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Registros por Lote</h5></div>
+                <div class="card-body">
+                    <canvas id="chart-records" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Resultados por Lote</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Lote #</th>
+                            <th>Registros</th>
+                            <th>Accuracy</th>
+                            <th>Precision</th>
+                            <th>Recall</th>
+                            <th>F1 Score</th>
+                            <th>Tiempo (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        <tr>
+                            <td>{{ result.batch_number }}</td>
+                            <td>{{ result.records_processed }}</td>
+                            <td>{{ result.accuracy|floatformat:4 }}</td>
+                            <td>{{ result.precision|floatformat:4 }}</td>
+                            <td>{{ result.recall|floatformat:4 }}</td>
+                            <td>{{ result.f1_score|floatformat:4 }}</td>
+                            <td>{{ result.processing_time|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-muted">No hay resultados aún. Esperando el primer lote procesado...</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No hay resultados disponibles. Por favor, procesa algunos datos primero.
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'home' %}" class="btn btn-primary">Volver al Inicio</a>
+        <a href="{% url 'job_history' %}" class="btn btn-secondary ms-2">Ver Historial</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js desde CDN (versión ligera) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Poll /api/results/ y actualizar solo la sección de métricas y la tabla de resultados.
+let pollTimer = null;
+const jobId = {{ job_id_js|default:'null' }};
+
+function formatNumber(n, digits=4){
+    if(n === null || n === undefined) return '-';
+    return Number(n).toFixed(digits);
+}
+
+function renderMetrics(avg){
+    // Actualiza métricas promedio
+    // Actualizamos las celdas por ID para evitar depender del orden del DOM
+    if(!avg) return;
+    const acc = document.getElementById('avg-accuracy');
+    const prec = document.getElementById('avg-precision');
+    const rec = document.getElementById('avg-recall');
+    const f1 = document.getElementById('avg-f1');
+    if(acc) acc.textContent = formatNumber(avg.accuracy);
+    if(prec) prec.textContent = formatNumber(avg.precision);
+    if(rec) rec.textContent = formatNumber(avg.recall);
+    if(f1) f1.textContent = formatNumber(avg.f1_score);
+}
+
+function renderResultsTable(results){
+    const tbody = document.querySelector('table.table.table-striped tbody');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    results.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${r.batch_number}</td>
+            <td>${r.records_processed}</td>
+            <td>${formatNumber(r.accuracy)}</td>
+            <td>${formatNumber(r.precision)}</td>
+            <td>${formatNumber(r.recall)}</td>
+            <td>${formatNumber(r.f1_score,4)}</td>
+            <td>${Number(r.processing_time).toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+let retryCount = 0;
+const MAX_RETRIES = 5;
+
+async function pollResults(){
+    if(!jobId) return;
+    try{
+        const url = '{% url "processing_results_json" %}?job_id=' + jobId;
+        const r = await fetch(url);
+        if(!r.ok) {
+            retryCount++;
+            if(retryCount > MAX_RETRIES) {
+                console.error('Demasiados intentos fallidos');
+                if(pollTimer) clearInterval(pollTimer);
+                return;
+            }
+            return;
+        }
+        retryCount = 0; // reset counter on successful fetch
+        const data = await r.json();
+
+        // actualizar progreso
+        const progressEls = document.querySelectorAll('.progress-bar');
+        if(progressEls && progressEls.length>0 && data.progress!==undefined){
+            progressEls.forEach(el=>{ el.style.width = data.progress + '%'; el.textContent = data.progress + '%'; })
+        }
+
+        // actualizar info superior: estado, total_records, lotes procesados
+        const statusBadge = document.getElementById('job-status-badge');
+        if(statusBadge){
+            if(data.status === 'completed'){
+                statusBadge.className = 'badge bg-success';
+                statusBadge.textContent = 'Completed';
+            } else if(data.status === 'error'){
+                statusBadge.className = 'badge bg-danger';
+                statusBadge.textContent = 'Error';
+            } else {
+                statusBadge.className = 'badge bg-warning';
+                statusBadge.textContent = 'Processing';
+            }
+        }
+
+        // actualizar totales y counts usando IDs
+        const totalRecordsTd = document.getElementById('job-total-records');
+        const lotesTdId = document.getElementById('job-lotes-procesados');
+        if(totalRecordsTd) totalRecordsTd.textContent = data.total_records;
+        if(lotesTdId) lotesTdId.textContent = data.results_count;
+
+        // renderizar métricas y tabla
+        renderMetrics(data.averages);
+        renderResultsTable(data.results || []);
+
+        // actualizar gráficos
+        updateCharts(data.results || []);
+
+        if(data.status === 'completed' || data.status === 'error'){
+            if(pollTimer) clearInterval(pollTimer);
+            // dejar estado final visible; no recargar
+        }
+
+    }catch(err){
+        console.error('poll error', err);
+    }
+}
+
+pollTimer = setInterval(pollResults, 2000);
+pollResults();
+</script>
+<script>
+// Chart.js: inicialización y actualización segura
+let accuracyChart = null;
+let recordsChart = null;
+
+function createCharts(){
+    const accCtx = document.getElementById('chart-accuracy');
+    const recCtx = document.getElementById('chart-records');
+    if(accCtx && !accuracyChart){
+        accuracyChart = new Chart(accCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Accuracy',
+                    data: [],
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.2,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { title: { display: true, text: 'Lote' } }, y: { beginAtZero: true, max: 1 } }
+            }
+        });
+    }
+    if(recCtx && !recordsChart){
+        recordsChart = new Chart(recCtx, {
+            type: 'bar',
+            data: { labels: [], datasets: [{ label: 'Registros', data: [], backgroundColor: 'rgba(54, 162, 235, 0.7)' }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Lote' } }, y: { beginAtZero: true } } }
+        });
+    }
+}
+
+function updateCharts(results){
+    if(!results) return;
+    createCharts();
+    const labels = results.map(r=> String(r.batch_number));
+    const accData = results.map(r=> (r.accuracy === null || r.accuracy === undefined) ? null : Number(r.accuracy));
+    const recData = results.map(r=> Number(r.records_processed));
+
+    if(accuracyChart){
+        accuracyChart.data.labels = labels;
+        accuracyChart.data.datasets[0].data = accData;
+        accuracyChart.update('none');
+    }
+    if(recordsChart){
+        recordsChart.data.labels = labels;
+        recordsChart.data.datasets[0].data = recData;
+        recordsChart.update('none');
+    }
+}
+
+// crear charts vacíos al cargar para evitar flicker
+document.addEventListener('DOMContentLoaded', ()=>{ createCharts(); });
+</script>
+{% endblock %}

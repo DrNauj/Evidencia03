@@ -1,0 +1,14 @@
+django==4.2.6
+# pinned to a newer 3.4.x Spark build which works well with Java 11/17
+pyspark==3.4.1
+pandas==1.5.3
+numpy==1.24.3
+python-dotenv==1.0.0
+django-crispy-forms==2.0
+crispy-bootstrap4==2022.1
+matplotlib==3.7.1
+seaborn==0.12.2
+findspark==2.0.1
+# Windows helper for some OS-level calls
+pywin32==305
+psutil>=5.8.0

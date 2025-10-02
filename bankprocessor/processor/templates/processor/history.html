@@ -1,0 +1,79 @@
+{% extends "processor/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Historial de Procesamientos</h2>
+    {% if jobs %}
+    <div class="d-flex justify-content-between mb-2">
+        <div>
+            <form method="get" class="d-inline">
+                <label>Ordenar por:</label>
+                <select name="order_by" class="form-select d-inline w-auto">
+                    <option value="started_at" {% if order_started %}selected{% endif %}>Inicio</option>
+                    <option value="progress" {% if order_progress %}selected{% endif %}>Progreso</option>
+                    <option value="batch_size" {% if order_batch_size %}selected{% endif %}>Tamaño Lote</option>
+                </select>
+                <select name="sort" class="form-select d-inline w-auto ms-2">
+                    <option value="desc" {% if not sort_asc %}selected{% endif %}>Desc</option>
+                    <option value="asc" {% if sort_asc %}selected{% endif %}>Asc</option>
+                </select>
+                <button class="btn btn-sm btn-secondary ms-2">Aplicar</button>
+            </form>
+        </div>
+        <div>
+            <form method="post" action="{% url 'job_clear_history' %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-danger">Limpiar historial (completed/error)</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Iniciado</th>
+                    <th>Estado</th>
+                    <th>Clave</th>
+                    <th>Tamaño Lote</th>
+                    <th>Progreso</th>
+                    <th>Resultados</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for j in jobs %}
+                <tr>
+                    <td>{{ j.id }}</td>
+                    <td>{{ j.started_at }}</td>
+                    <td>{{ j.get_status_display }}</td>
+                    <td>{{ j.batch_key }}</td>
+                    <td>{{ j.batch_size }}</td>
+                    <td>{{ j.progress }}%</td>
+                    <td>{{ j.batchresult_set.count }}</td>
+                    <td>
+                        <a href="{% url 'view_results_job' j.id %}" class="btn btn-sm btn-primary">Ver</a>
+                        <form method="post" action="{% url 'job_terminate' j.id %}" class="d-inline ms-1">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-warning">Terminar</button>
+                        </form>
+                        <form method="post" action="{% url 'job_resume' j.id %}" class="d-inline ms-1">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-success">Reanudar</button>
+                        </form>
+                        <form method="post" action="{% url 'job_delete' j.id %}" class="d-inline ms-1" onsubmit="return confirm('Eliminar job {{ j.id }}? Esta acción no se puede deshacer.')">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">No hay trabajos registrados.</div>
+    {% endif %}
+</div>
+{% endblock %}
