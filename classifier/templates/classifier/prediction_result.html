@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="text-center">Resultado de la Predicción</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert {% if prediction.prediction == 'yes' %}alert-success{% else %}alert-warning{% endif %}">
+                        <h4 class="alert-heading">
+                            {% if prediction.prediction == 'yes' %}
+                                ¡Cliente potencial identificado!
+                            {% else %}
+                                Cliente menos probable de aceptar
+                            {% endif %}
+                        </h4>
+                        <p>
+                            Basado en los datos proporcionados, nuestro modelo predice que este cliente
+                            {% if prediction.prediction == 'yes' %}
+                                es más probable que acepte el depósito a plazo.
+                            {% else %}
+                                es menos probable que acepte el depósito a plazo.
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <h3 class="mt-4">Detalles del Cliente</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Edad:</strong> {{ prediction.age }}</p>
+                            <p><strong>Trabajo:</strong> {{ prediction.job }}</p>
+                            <p><strong>Estado Civil:</strong> {{ prediction.marital }}</p>
+                            <p><strong>Educación:</strong> {{ prediction.education }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Balance:</strong> {{ prediction.balance }}</p>
+                            <p><strong>Préstamo hipotecario:</strong> {{ prediction.housing }}</p>
+                            <p><strong>Préstamo personal:</strong> {{ prediction.loan }}</p>
+                            <p><strong>Resultado anterior:</strong> {{ prediction.poutcome }}</p>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="{% url 'predict_customer' %}" class="btn btn-primary">Nueva Predicción</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
